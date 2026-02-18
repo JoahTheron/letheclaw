@@ -90,7 +90,6 @@ letheclaw/
 ├── config/
 │   └── letheclaw.yaml
 ├── docker-compose.yml
-├── docker-compose-addon.yml   # Snippet to merge into an existing compose
 ├── Makefile
 ├── QUICKSTART.md
 ├── WINDOWS.md

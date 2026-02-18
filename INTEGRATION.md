@@ -1,55 +1,22 @@
 # letheClaw + OpenClaw Integration Guide
 
-This guide shows how to add letheClaw to your **existing** OpenClaw docker-compose.yml.
+This guide shows how to add letheClaw to your **existing** OpenClaw docker-compose.yml. There is no separate addon file: use the main **docker-compose.yml** in this repo as the source and adapt it as below.
 
 ---
 
-## Step 1: Add Services to Your Compose File
+## Step 1: Add letheClaw Services to Your Compose File
 
-**Location:** Your OpenClaw project directory — e.g. `docker-compose.yml` in the repo root.
+1. **Copy the full `services:` block** from this repo’s **docker-compose.yml** (postgres, qdrant, redis, letheclaw-embeddings, letheclaw-api) into your OpenClaw `docker-compose.yml`.
 
-**Action:** Append the contents of `docker-compose-addon.yml` to your existing compose file.
+2. **Avoid name clashes** with existing services:
+   - If you already have `postgres`, `redis`, or `qdrant`, rename the letheClaw ones (e.g. `letheclaw-postgres`, `letheclaw-redis`, `letheclaw-qdrant`) and set the API env vars to use those hostnames (e.g. `letheclaw-postgres:5432`, `letheclaw-redis:6379`, `letheclaw-qdrant:6333`).
+   - If names don’t clash, you can keep `postgres`, `redis`, `qdrant` as-is.
 
-### Your Current Structure:
-```yaml
-services:
-  openclaw:
-    ...
-  browser:
-    ...
-```
+3. **Point build and volumes at your letheClaw copy:**
+   - Replace `./api` and `./embeddings` with the path to this repo (or the letheclaw folder) on your machine, e.g. `./workspace/letheclaw/api` and `./workspace/letheclaw/embeddings`.
+   - Replace `./config` and `./schema` with the same base path (e.g. `./workspace/letheclaw/config`, `./workspace/letheclaw/schema`).
 
-### After Adding letheClaw:
-```yaml
-services:
-  openclaw:
-    ...
-  browser:
-    ...
-  
-  # Copy everything from docker-compose-addon.yml here
-  letheclaw-postgres:
-    ...
-  letheclaw-qdrant:
-    ...
-  letheclaw-redis:
-    ...
-  letheclaw-embeddings:
-    ...
-  letheclaw-api:
-    ...
-
-volumes:
-  # Your existing volumes
-  ...
-  # letheClaw volumes
-  letheclaw-postgres-data:
-    ...
-  letheclaw-qdrant-data:
-    ...
-  letheclaw-redis-data:
-    ...
-```
+4. **Add the same volumes** as in docker-compose.yml: `postgres_data`, `qdrant_data`, `redis_data` (or prefixed names if you renamed the services).
 
 ---
 
@@ -58,7 +25,7 @@ volumes:
 ```bash
 cd /path/to/your-openclaw-project
 
-# Build new services
+# Build letheClaw services (paths from Step 1)
 docker compose build letheclaw-api letheclaw-embeddings
 
 # Start everything (existing + new services)
@@ -68,16 +35,7 @@ docker compose up -d
 docker compose ps
 ```
 
-Expected output:
-```
-NAME                    STATUS
-openclaw                Up
-browser                 Up
-letheclaw-postgres      Up (healthy)
-letheclaw-qdrant        Up (healthy)
-letheclaw-redis         Up (healthy)
-letheclaw-embeddings    Up (healthy)
-letheclaw-api           Up (healthy)
+Expected: openclaw, browser, and all letheClaw services (postgres, qdrant, redis, letheclaw-embeddings, letheclaw-api) Up / healthy.
 ```
 
 ---
@@ -305,7 +263,7 @@ docker compose exec openclaw curl http://letheclaw-api:8080/health
 
 ## Next Steps
 
-1. **Add to compose file** - Copy services from `docker-compose-addon.yml`
+1. **Add to compose file** - Copy services from this repo’s `docker-compose.yml` and adapt (see Step 1 above)
 2. **Build services** - `docker compose build`
 3. **Start everything** - `docker compose up -d`
 4. **Test API** - `curl http://localhost:51234/health`
@@ -325,7 +283,7 @@ C:\GithubProjects\persoclaw\openclaw-data\
 │       ├── embeddings\         (Python embedding service)
 │       ├── schema\             (PostgreSQL init script)
 │       ├── config\             (letheclaw.yaml)
-│       └── docker-compose-addon.yml  (copy contents to main compose)
+│       └── docker-compose.yml        (copy service definitions into your compose)
 ```
 
 ---
