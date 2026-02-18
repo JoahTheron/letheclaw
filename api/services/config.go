@@ -1,7 +1,10 @@
 package services
 
 import (
+	"net/url"
 	"os"
+	"strconv"
+	"strings"
 
 	"github.com/letheclaw/api/models"
 	"gopkg.in/yaml.v3"
@@ -26,10 +29,13 @@ func LoadConfig(path string) (*models.Config, error) {
 }
 
 func applyEnvOverrides(config *models.Config) {
-	// Database URL override
+	// Database URL override (so integrated compose can use a different host, e.g. letheclaw-postgres)
 	if dbURL := os.Getenv("DATABASE_URL"); dbURL != "" {
-		// Parse DATABASE_URL and update config.Database
-		// For simplicity, we'll just note that this should be implemented
+		if err := applyDatabaseURL(config, dbURL); err != nil {
+			// Log but don't fail: fall back to YAML config
+			// (caller has no logger; rely on InitDB failing with clear message if wrong host)
+			_ = err
+		}
 	}
 
 	// Redis URL override
@@ -49,4 +55,30 @@ func applyEnvOverrides(config *models.Config) {
 	if endpoint := os.Getenv("EMBEDDING_ENDPOINT"); endpoint != "" {
 		config.Embedding.Endpoint = endpoint
 	}
+}
+
+// applyDatabaseURL parses DATABASE_URL (e.g. postgresql://user:pass@host:5432/dbname?sslmode=disable)
+// and sets config.Database so InitDB uses the correct host when integrated into another compose.
+func applyDatabaseURL(config *models.Config, rawURL string) error {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return err
+	}
+	host := u.Hostname()
+	config.Database.Host = host
+	if port := u.Port(); port != "" {
+		if p, err := strconv.Atoi(port); err == nil {
+			config.Database.Port = p
+		}
+	}
+	if u.User != nil {
+		config.Database.User = u.User.Username()
+		if p, ok := u.User.Password(); ok {
+			config.Database.Password = p
+		}
+	}
+	if u.Path != "" {
+		config.Database.Name = strings.TrimPrefix(u.Path, "/")
+	}
+	return nil
 }
