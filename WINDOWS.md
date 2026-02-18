@@ -44,7 +44,7 @@ First run downloads the embedding model (~80MB). This takes 1-2 minutes.
 
 ```powershell
 # Check logs
-docker compose logs -f letheclaw-embeddings
+docker compose logs -f embeddings
 
 # Wait for: "Model loaded successfully. Embedding dimension: 384"
 ```

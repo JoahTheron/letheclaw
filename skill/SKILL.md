@@ -8,7 +8,7 @@ tools: [network]
 
 # letheClaw — Agent memory
 
-You can use the letheClaw API to store and retrieve memories for the user or the current session. The API base URL is in the environment variable **LETHECLAW_API_URL** (e.g. `http://letheclaw-api:8080` when running in Docker with letheClaw, or `http://localhost:51234` for local testing). If unset, ask the user for the letheClaw API URL or assume a default they provide.
+You can use the letheClaw API to store and retrieve memories for the user or the current session. The API base URL is in the environment variable **LETHECLAW_API_URL** (e.g. `http://api:8080` when running in Docker with letheClaw, or `http://localhost:51234` for local testing). If unset, ask the user for the letheClaw API URL or assume a default they provide.
 
 ## Store a memory
 

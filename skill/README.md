@@ -5,7 +5,7 @@ This skill lets OpenClaw agents use **letheClaw** (strategic memory for AI agent
 ## What you need
 
 - A running letheClaw API.  
-  - In Docker with letheClaw: the API is usually at `http://letheclaw-api:8080`.  
+  - In Docker with letheClaw: the API is usually at `http://api:8080`.  
   - On the host: often `http://localhost:51234` (see the main repo [README](../README.md) and [QUICKSTART](../QUICKSTART.md)).
 - Set **LETHECLAW_API_URL** in your environment to the API base URL (no trailing slash), so the agent knows where to call.
 

@@ -59,7 +59,7 @@ cd letheclaw
 make infra
 
 # Or manually:
-docker compose up -d postgres qdrant redis letheclaw-embeddings
+docker compose up -d postgres qdrant redis embeddings
 ```
 
 ### Step 2: Build and Run API Locally
@@ -201,7 +201,7 @@ The Python sidecar takes time to start (downloads 80MB model on first run).
 
 ```bash
 # Check logs
-docker compose logs letheclaw-embeddings
+docker compose logs embeddings
 
 # Wait for: "Model loaded successfully. Embedding dimension: 384"
 ```

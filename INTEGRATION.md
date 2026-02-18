@@ -6,7 +6,7 @@ This guide shows how to add letheClaw to your **existing** OpenClaw docker-compo
 
 ## Step 1: Add letheClaw Services to Your Compose File
 
-1. **Copy the full `services:` block** from this repo’s **docker-compose.yml** (postgres, qdrant, redis, letheclaw-embeddings, letheclaw-api) into your OpenClaw `docker-compose.yml`.
+1. **Copy the full `services:` block** from this repo’s **docker-compose.yml** (postgres, qdrant, redis, embeddings, api) into your OpenClaw `docker-compose.yml`.
 
 2. **Avoid name clashes** with existing services:
    - If you already have `postgres`, `redis`, or `qdrant`, rename the letheClaw ones (e.g. `letheclaw-postgres`, `letheclaw-redis`, `letheclaw-qdrant`) and set the API env vars to use those hostnames (e.g. `letheclaw-postgres:5432`, `letheclaw-redis:6379`, `letheclaw-qdrant:6333`).
@@ -26,7 +26,7 @@ This guide shows how to add letheClaw to your **existing** OpenClaw docker-compo
 cd /path/to/your-openclaw-project
 
 # Build letheClaw services (paths from Step 1)
-docker compose build letheclaw-api letheclaw-embeddings
+docker compose build api embeddings
 
 # Start everything (existing + new services)
 docker compose up -d
@@ -35,7 +35,7 @@ docker compose up -d
 docker compose ps
 ```
 
-Expected: openclaw, browser, and all letheClaw services (postgres, qdrant, redis, letheclaw-embeddings, letheclaw-api) Up / healthy.
+Expected: openclaw, browser, and all letheClaw services (postgres, qdrant, redis, embeddings, api) Up / healthy.
 ```
 
 ---
@@ -61,7 +61,7 @@ curl -X POST http://localhost:51234/memory `
 **From inside OpenClaw container:**
 ```bash
 # OpenClaw agents can reach it at:
-# http://letheclaw-api:8080/memory
+# http://api:8080/memory  (or http://letheclaw-api:8080 if you renamed the service)
 ```
 
 ---
@@ -77,7 +77,7 @@ import requests
 
 # Store memory
 response = requests.post(
-    "http://letheclaw-api:8080/memory",
+    "http://api:8080/memory",
     json={
         "content": "Important decision made today",
         "source": "direct_observation",
@@ -93,7 +93,7 @@ memory_id = response.json()["memory_id"]
 ```python
 # Search memory
 response = requests.get(
-    "http://letheclaw-api:8080/memory/search",
+    "http://api:8080/memory/search",
     params={"q": "decision", "limit": 5}
 )
 
@@ -110,7 +110,7 @@ Create a skill that wraps letheClaw:
 #!/bin/bash
 # letheClaw Memory Skill
 
-API="http://letheclaw-api:8080"
+API="http://api:8080"
 
 case "$1" in
   store)
@@ -152,7 +152,7 @@ Modify OpenClaw's memory tools to route through letheClaw:
 {
   "memory": {
     "backend": "http",
-    "endpoint": "http://letheclaw-api:8080"
+    "endpoint": "http://api:8080"
   }
 }
 ```
@@ -168,11 +168,11 @@ Modify OpenClaw's memory tools to route through letheClaw:
 │                                                         │
 │  openclaw:8080 (your agent runtime)                    │
 │    ↓ HTTP                                              │
-│  letheclaw-api:8080 (memory API)                       │
-│    ├─→ letheclaw-embeddings:5000 (Python)             │
-│    ├─→ letheclaw-postgres:5432 (metadata)              │
-│    ├─→ letheclaw-qdrant:6333 (vectors)                 │
-│    └─→ letheclaw-redis:6379 (cache)                    │
+│  api:8080 (memory API)                                 │
+│    ├─→ embeddings:5000 (Python)                       │
+│    ├─→ postgres:5432 (metadata)                        │
+│    ├─→ qdrant:6333 (vectors)                           │
+│    └─→ redis:6379 (cache)                              │
 │                                                         │
 └─────────────────────────────────────────────────────────┘
      ↑
@@ -182,7 +182,7 @@ Modify OpenClaw's memory tools to route through letheClaw:
 ```
 
 **Important:**
-- OpenClaw → letheClaw: Use `http://letheclaw-api:8080` (internal network)
+- OpenClaw → letheClaw: Use `http://api:8080` (internal network; or the hostname of the service if you renamed it)
 - Host → letheClaw: Use `http://localhost:51234` (exposed port)
 
 ---
@@ -196,13 +196,13 @@ services:
   openclaw:
     environment:
       # ... your existing vars
-      - LETHECLAW_API_URL=http://letheclaw-api:8080
+      - LETHECLAW_API_URL=http://api:8080
 ```
 
 Then in agent code:
 ```python
 import os
-api_url = os.getenv("LETHECLAW_API_URL", "http://letheclaw-api:8080")
+api_url = os.getenv("LETHECLAW_API_URL", "http://api:8080")
 ```
 
 ---
@@ -217,16 +217,16 @@ api_url = os.getenv("LETHECLAW_API_URL", "http://letheclaw-api:8080")
 docker compose exec openclaw sh
 
 # Test connectivity
-curl http://letheclaw-api:8080/health
+curl http://api:8080/health
 ```
 
 ### Services not starting
 
 **Check logs:**
 ```powershell
-docker compose logs letheclaw-api
-docker compose logs letheclaw-embeddings
-docker compose logs letheclaw-postgres
+docker compose logs api
+docker compose logs embeddings
+docker compose logs postgres
 ```
 
 ### Build failures (go.sum issues)
@@ -256,7 +256,7 @@ curl -X POST http://localhost:51234/memory `
 curl "http://localhost:51234/memory/search?q=test"
 
 # 5. Test from OpenClaw container
-docker compose exec openclaw curl http://letheclaw-api:8080/health
+docker compose exec openclaw curl http://api:8080/health
 ```
 
 ---

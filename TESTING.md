@@ -93,5 +93,5 @@ Requires `jq`. If you don’t have it, use the step-by-step commands above and c
 
 ## Troubleshooting
 
-- **`Failed to generate embedding` / `connection refused` to `letheclaw-embeddings:5000`**  
+- **`Failed to generate embedding` / `connection refused` to `embeddings:5000`**  
   The embedding sidecar may still be starting (e.g. first run loads the model). Wait 30–60s and retry the POST; `/memory/recent` and `/health` can still work while the sidecar is down.

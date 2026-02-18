@@ -1,6 +1,9 @@
+name: letheclaw
+
 services:
   # Python embedding service (internal only; called by API via Docker network)
-  letheclaw-embeddings:
+  embeddings:
+    image: joahtheron/letheclaw-embeddings
     build:
       context: ./embeddings
       dockerfile: Dockerfile
@@ -17,7 +20,8 @@ services:
       retries: 3
 
   # Main API service (Go)
-  letheclaw-api:
+  api:
+    image: joahtheron/letheclaw-api
     build:
       context: ./api
       dockerfile: Dockerfile
@@ -28,13 +32,13 @@ services:
       - REDIS_URL=redis://redis:6379/0
       - QDRANT_URL=http://qdrant:6333
       - EMBEDDING_PROVIDER=python-sidecar
-      - EMBEDDING_ENDPOINT=http://letheclaw-embeddings:5000
+      - EMBEDDING_ENDPOINT=http://embeddings:5000
       - LOG_LEVEL=info
     depends_on:
       - postgres
       - redis
       - qdrant
-      - letheclaw-embeddings
+      - embeddings
     volumes:
       - ./config:/app/config:ro
     restart: unless-stopped

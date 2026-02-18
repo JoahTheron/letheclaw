@@ -28,7 +28,7 @@ redis:
 
 embedding:
   provider: python-sidecar  # ollama | python-sidecar | openclaw-gateway
-  endpoint: http://letheclaw-embeddings:5000
+  endpoint: http://embeddings:5000
   model: sentence-transformers/all-MiniLM-L6-v2
   timeout_seconds: 30
 
