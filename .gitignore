@@ -1,0 +1,47 @@
+# Binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+letheclaw-api
+letheclaw-consolidator
+
+# Test binary
+*.test
+
+# Output of go coverage tool
+*.out
+
+# Go workspace file
+go.work
+
+# Docker volumes
+postgres_data/
+qdrant_data/
+redis_data/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# Environment
+.env
+.env.local

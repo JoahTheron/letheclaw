@@ -1,0 +1,29 @@
+# Git
+.git
+.gitignore
+
+# Documentation
+*.md
+
+# Docker compose files (not needed inside containers)
+docker-compose.yml
+docker-compose-addon.yml
+.dockerignore
+
+# Build artifacts
+*.exe
+
+# Test/dev files
+Makefile
+
+# IDE
+.vscode
+.idea
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log

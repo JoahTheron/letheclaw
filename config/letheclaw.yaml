@@ -1,0 +1,54 @@
+---
+# letheClaw Configuration
+
+api:
+  port: 8080
+  log_level: info
+  request_timeout_seconds: 30
+
+database:
+  host: postgres
+  port: 5432
+  name: letheclaw
+  user: letheclaw
+  password: letheclaw_pass
+  max_connections: 20
+  connection_timeout_seconds: 10
+
+qdrant:
+  url: http://qdrant:6333
+  collection: memories
+  vector_size: 384  # all-MiniLM-L6-v2 default, adjust for your embedding model
+  distance: Cosine
+
+redis:
+  url: redis://redis:6379/0
+  ttl_hours: 24
+  max_connections: 10
+
+embedding:
+  provider: python-sidecar  # ollama | python-sidecar | openclaw-gateway
+  endpoint: http://letheclaw-embeddings:5000
+  model: sentence-transformers/all-MiniLM-L6-v2
+  timeout_seconds: 30
+
+decay:
+  threshold_days: 90          # Start decay after 90 days unused
+  decay_rate: 0.1             # Decay speed (0-1)
+  min_criticality: 0.3        # Never decay above this criticality
+
+consolidation:
+  interval_hours: 1           # Run consolidation every hour
+  batch_size: 1000            # Process N memories per run
+  similarity_threshold: 0.95  # Merge if similarity > this
+
+criticality:
+  operator_correction_weight: 0.5   # Boost score on correction
+  failure_weight: 0.3               # Boost score on failure event
+  success_weight: 0.1               # Smaller boost on success
+  decay_weight: -0.05               # Penalty for unused
+
+retention:
+  min_days: 30                # Keep everything for at least 30 days
+  archive_threshold: 0.2      # Archive if criticality < this
+  delete_threshold: 0.1       # Delete if criticality < this

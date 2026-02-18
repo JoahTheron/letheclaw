@@ -1,0 +1,120 @@
+services:
+  # Python embedding service (internal only; called by API via Docker network)
+  letheclaw-embeddings:
+    build:
+      context: ./embeddings
+      dockerfile: Dockerfile
+    environment:
+      - MODEL=sentence-transformers/all-MiniLM-L6-v2
+      - DEVICE=cpu
+      - PORT=5000
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "python -c 'import urllib.request; urllib.request.urlopen(\"http://localhost:5000/health\")' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
+
+  # Main API service (Go)
+  letheclaw-api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    ports:
+      - "51234:8080"   # Only exposed entry: host port in dynamic range to avoid conflicts
+    environment:
+      - DATABASE_URL=postgresql://letheclaw:letheclaw_pass@postgres:5432/letheclaw?sslmode=disable
+      - REDIS_URL=redis://redis:6379/0
+      - QDRANT_URL=http://qdrant:6333
+      - EMBEDDING_PROVIDER=python-sidecar
+      - EMBEDDING_ENDPOINT=http://letheclaw-embeddings:5000
+      - LOG_LEVEL=info
+    depends_on:
+      - postgres
+      - redis
+      - qdrant
+      - letheclaw-embeddings
+    volumes:
+      - ./config:/app/config:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # PostgreSQL - structured memory metadata (internal only)
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_DB=letheclaw
+      - POSTGRES_USER=letheclaw
+      - POSTGRES_PASSWORD=letheclaw_pass
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./schema:/docker-entrypoint-initdb.d:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U letheclaw"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Qdrant - vector embeddings for semantic search (internal only)
+  qdrant:
+    image: qdrant/qdrant:v1.7.4
+    volumes:
+      - qdrant_data:/qdrant/storage
+    environment:
+      - QDRANT__SERVICE__GRPC_PORT=6334
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c ':> /dev/tcp/localhost/6333' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Redis - hot cache for recent context (internal only)
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Consolidator - background worker (Go) - Phase 3, disabled for now
+  # letheclaw-consolidator:
+  #   build:
+  #     context: ./consolidator
+  #     dockerfile: Dockerfile
+  #   environment:
+  #     - DATABASE_URL=postgresql://letheclaw:letheclaw_pass@postgres:5432/letheclaw?sslmode=disable
+  #     - REDIS_URL=redis://redis:6379/0
+  #     - QDRANT_URL=http://qdrant:6333
+  #     - CONSOLIDATION_INTERVAL=3600
+  #     - LOG_LEVEL=info
+  #   depends_on:
+  #     - postgres
+  #     - redis
+  #     - qdrant
+  #   volumes:
+  #     - ./config:/app/config:ro
+  #   restart: unless-stopped
+
+volumes:
+  postgres_data:
+    driver: local
+  qdrant_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  default:
+    name: letheclaw-network
