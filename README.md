@@ -56,7 +56,7 @@ curl http://localhost:51234/health
 
 ---
 
-## API (Phase 1)
+## API
 
 | Method | Path | Description |
 |--------|------|-------------|
@@ -64,8 +64,11 @@ curl http://localhost:51234/health
 | POST | `/memory` | Store a memory (content, tags, source, …) |
 | GET | `/memory/search?q=...&limit=5` | Semantic search |
 | GET | `/memory/recent` | Recent memories (cache or DB) |
+| POST | `/memory/:id/criticality` | Set criticality (body: `{"criticality": 0.8, "reason": "..."}`) |
+| POST | `/memory/:id/correction` | Mark operator correction (boosts criticality, increments counter) |
+| GET | `/memory/:id/provenance` | Get memory plus full criticality event history |
 
-Phase 2 endpoints (criticality, correction, provenance) are stubbed and documented in [INTEGRATION.md](INTEGRATION.md).
+Phase 1 (store, search, recent) and Phase 2 (criticality, correction, provenance) are implemented. Integration with OpenClaw/ClawHub: [INTEGRATION.md](INTEGRATION.md), [skill/](skill/).
 
 ---
 
@@ -94,6 +97,8 @@ letheclaw/
 ├── QUICKSTART.md
 ├── WINDOWS.md
 ├── INTEGRATION.md
+├── skill/             # ClawHub skill (instructions + manifest)
+├── TESTING.md         # Manual test guide
 ├── LICENSE
 └── README.md
 ```

@@ -269,9 +269,11 @@ This removes:
 - [x] Python embedding service
 - [x] PostgreSQL + Qdrant + Redis integration
 
-### Phase 2: Criticality & OpenClaw integration
+### Phase 2 complete ✅
 
-See [INTEGRATION.md](INTEGRATION.md) for adding letheClaw to an existing OpenClaw stack.
+- [x] POST /memory/:id/criticality, POST /memory/:id/correction, GET /memory/:id/provenance
+- Manual test flow: [TESTING.md](TESTING.md)
+- ClawHub skill: [skill/](skill/). OpenClaw integration: [INTEGRATION.md](INTEGRATION.md).
 
 ---
 

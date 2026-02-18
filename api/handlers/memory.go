@@ -322,44 +322,178 @@ func (h *MemoryHandler) GetRecentMemories(c *gin.Context) {
 
 // UpdateCriticality - POST /memory/:id/criticality
 func (h *MemoryHandler) UpdateCriticality(c *gin.Context) {
-	memoryID := c.Param("id")
-	
+	id, err := parseMemoryID(c)
+	if err != nil {
+		return
+	}
+
 	var req models.UpdateCriticalityRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request", "details": err.Error()})
 		return
 	}
+	if req.Criticality < 0 || req.Criticality > 1 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "criticality must be between 0 and 1"})
+		return
+	}
 
-	// TODO: Implement criticality update logic
+	var oldScore float64
+	err = h.DB.QueryRow(
+		`SELECT criticality FROM memories WHERE id = $1 AND state = 'active'`,
+		id,
+	).Scan(&oldScore)
+	if err == sql.ErrNoRows {
+		c.JSON(http.StatusNotFound, gin.H{"error": "memory not found"})
+		return
+	}
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load memory", "details": err.Error()})
+		return
+	}
+
+	_, err = h.DB.Exec(
+		`UPDATE memories SET criticality = $1 WHERE id = $2`,
+		req.Criticality, id,
+	)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update criticality", "details": err.Error()})
+		return
+	}
+
+	reason := nullString(req.Reason)
+	_, err = h.DB.Exec(
+		`INSERT INTO criticality_events (memory_id, event_type, old_score, new_score, reason) VALUES ($1, 'manual_boost', $2, $3, $4)`,
+		id, oldScore, req.Criticality, reason,
+	)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to record event", "details": err.Error()})
+		return
+	}
+
 	c.JSON(http.StatusOK, gin.H{
-		"status": "success",
-		"message": "Criticality update not yet implemented",
-		"memory_id": memoryID,
+		"status":      "success",
+		"memory_id":   id,
+		"criticality": req.Criticality,
 	})
 }
 
 // MarkCorrection - POST /memory/:id/correction
 func (h *MemoryHandler) MarkCorrection(c *gin.Context) {
-	memoryID := c.Param("id")
+	id, err := parseMemoryID(c)
+	if err != nil {
+		return
+	}
 
-	// TODO: Implement operator correction tracking
+	var oldScore float64
+	err = h.DB.QueryRow(
+		`SELECT criticality FROM memories WHERE id = $1 AND state = 'active'`,
+		id,
+	).Scan(&oldScore)
+	if err == sql.ErrNoRows {
+		c.JSON(http.StatusNotFound, gin.H{"error": "memory not found"})
+		return
+	}
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load memory", "details": err.Error()})
+		return
+	}
+
+	weight := 0.5
+	if h.Config != nil && h.Config.Criticality.OperatorCorrectionWeight > 0 {
+		weight = h.Config.Criticality.OperatorCorrectionWeight
+	}
+	newScore := oldScore + weight
+	if newScore > 1 {
+		newScore = 1
+	}
+
+	_, err = h.DB.Exec(
+		`UPDATE memories SET criticality = $1, correction_count = correction_count + 1 WHERE id = $2`,
+		newScore, id,
+	)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update memory", "details": err.Error()})
+		return
+	}
+
+	_, err = h.DB.Exec(
+		`INSERT INTO criticality_events (memory_id, event_type, old_score, new_score) VALUES ($1, 'operator_correction', $2, $3)`,
+		id, oldScore, newScore,
+	)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to record event", "details": err.Error()})
+		return
+	}
+
 	c.JSON(http.StatusOK, gin.H{
-		"status": "success",
-		"message": "Correction marking not yet implemented",
-		"memory_id": memoryID,
+		"status":      "success",
+		"memory_id":   id,
+		"criticality": newScore,
 	})
 }
 
 // GetProvenance - GET /memory/:id/provenance
 func (h *MemoryHandler) GetProvenance(c *gin.Context) {
-	memoryID := c.Param("id")
+	id, err := parseMemoryID(c)
+	if err != nil {
+		return
+	}
 
-	// TODO: Implement provenance retrieval
-	c.JSON(http.StatusOK, gin.H{
-		"status": "success",
-		"message": "Provenance retrieval not yet implemented",
-		"memory_id": memoryID,
-	})
+	var m models.Memory
+	err = h.DB.QueryRow(`
+		SELECT id, content, source, confidence, criticality, tags,
+		       operator, session_key, context, correction_count,
+		       created_at, last_accessed, access_count, decay_score, state
+		FROM memories WHERE id = $1 AND state = 'active'`,
+		id,
+	).Scan(
+		&m.ID, &m.Content, &m.Source, &m.Confidence, &m.Criticality, pq.Array(&m.Tags),
+		&m.Operator, &m.SessionKey, &m.Context, &m.CorrectionCount,
+		&m.CreatedAt, &m.LastAccessed, &m.AccessCount, &m.DecayScore, &m.State,
+	)
+	if err == sql.ErrNoRows {
+		c.JSON(http.StatusNotFound, gin.H{"error": "memory not found"})
+		return
+	}
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load memory", "details": err.Error()})
+		return
+	}
+
+	rows, err := h.DB.Query(
+		`SELECT id, memory_id, event_type, old_score, new_score, reason, created_at
+		 FROM criticality_events WHERE memory_id = $1 ORDER BY created_at ASC`,
+		id,
+	)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load events", "details": err.Error()})
+		return
+	}
+	defer rows.Close()
+
+	var events []models.CriticalityEvent
+	for rows.Next() {
+		var e models.CriticalityEvent
+		var reason *string
+		if err := rows.Scan(&e.ID, &e.MemoryID, &e.EventType, &e.OldScore, &e.NewScore, &reason, &e.CreatedAt); err != nil {
+			continue
+		}
+		e.Reason = reason
+		events = append(events, e)
+	}
+
+	c.JSON(http.StatusOK, models.Provenance{Memory: m, Events: events})
+}
+
+// parseMemoryID parses the :id param as UUID; on failure writes 400 and returns nil, err.
+func parseMemoryID(c *gin.Context) (uuid.UUID, error) {
+	idStr := c.Param("id")
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid memory id"})
+		return uuid.Nil, err
+	}
+	return id, nil
 }
 
 // Helper function for nullable strings

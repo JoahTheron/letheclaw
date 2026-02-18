@@ -45,3 +45,6 @@ venv/
 # Environment
 .env
 .env.local
+
+# IDE
+.cursor/

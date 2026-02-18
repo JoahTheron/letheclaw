@@ -47,9 +47,8 @@ type SearchMemoriesRequest struct {
 
 // UpdateCriticalityRequest is the request body for POST /memory/:id/criticality
 type UpdateCriticalityRequest struct {
-	EventType string  `json:"event_type" binding:"required"`
-	Boost     float64 `json:"boost"`
-	Reason    string  `json:"reason"`
+	Criticality float64 `json:"criticality" binding:"required"`
+	Reason      string  `json:"reason"`
 }
 
 // CriticalityEvent represents a criticality score change
