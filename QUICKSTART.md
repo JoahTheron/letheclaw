@@ -141,10 +141,11 @@ Expected:
       "access_count": 1,
       "content": "Quantum computing threatens RSA signatures",
       "created_at": "2026-02-18T16:00:00Z",
-      "criticality": 0.5,
       "id": "550e8400-e29b-41d4-a716-446655440000",
       "source": "operator_input",
-      "tags": ["security", "quantum"]
+      "tags": ["security", "quantum"],
+      "reference_count": 0,
+      "correction_count": 0
     }
   ],
   "status": "success"
@@ -183,7 +184,7 @@ Example queries:
 
 ```sql
 -- See all memories
-SELECT id, content, criticality, tags FROM memories LIMIT 10;
+SELECT id, content, reference_count, correction_count, tags FROM memories LIMIT 10;
 
 -- Count memories
 SELECT COUNT(*) FROM memories;
@@ -237,6 +238,18 @@ lsof -i :51234
 
 ---
 
+## Upgrading from v1.0 to v1.1
+
+If you have an existing database (created before v1.1), run the migration to add `reference_count` and remove the old `criticality` column:
+
+```bash
+docker compose exec postgres psql -U letheclaw -d letheclaw -f /docker-entrypoint-initdb.d/002_signals.sql
+```
+
+Fresh installs (`docker compose down -v && docker compose up -d`) need no action — both schema files run automatically on first boot.
+
+---
+
 ## Stopping & Cleanup
 
 ### Stop Services (Keep Data)
@@ -260,9 +273,9 @@ This removes:
 
 ---
 
-## Next Steps
+## Roadmap
 
-### Phase 1 Complete ✅
+### Phase 1 — Core storage ✅
 
 - [x] POST /memory (storage pipeline)
 - [x] GET /memory/search (semantic search)
@@ -270,11 +283,20 @@ This removes:
 - [x] Python embedding service
 - [x] PostgreSQL + Qdrant + Redis integration
 
-### Phase 2 complete ✅
+### Phase 2 — Signal-based criticality and corrections ✅ (v1.1)
 
-- [x] POST /memory/:id/criticality, POST /memory/:id/correction, GET /memory/:id/provenance
+- [x] Signal-based criticality (`{"signal": "failure|success|referenced"}`, rejects raw numbers)
+- [x] Automatic reference counting on search
+- [x] GET /memory/corrections (provenance-based, ordered by last correction)
+- [x] POST /memory/:id/correction, GET /memory/:id/provenance
 - Manual test flow: [TESTING.md](TESTING.md)
 - ClawHub skill: [skill/](skill/). OpenClaw integration: [INTEGRATION.md](INTEGRATION.md).
+
+### Phase 3 — Decay and consolidation (next)
+
+- [ ] Background worker: apply decay_weight to unused memories
+- [ ] Archive/delete based on retention thresholds
+- [ ] Consolidation: compress similar memories, prune duplicates
 
 ---
 

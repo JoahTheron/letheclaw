@@ -66,10 +66,11 @@ type CriticalityConfig struct {
 	FailureWeight            float64 `yaml:"failure_weight"`
 	SuccessWeight            float64 `yaml:"success_weight"`
 	DecayWeight              float64 `yaml:"decay_weight"`
+	ReferencedWeight         float64 `yaml:"referenced_weight"`
 }
 
 type RetentionConfig struct {
-	MinDays           int     `yaml:"min_days"`
-	ArchiveThreshold  float64 `yaml:"archive_threshold"`
-	DeleteThreshold   float64 `yaml:"delete_threshold"`
+	MinDays          int     `yaml:"min_days"`
+	ArchiveThreshold float64 `yaml:"archive_threshold"`
+	DeleteThreshold  float64 `yaml:"delete_threshold"`
 }

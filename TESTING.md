@@ -2,7 +2,7 @@
 
 Use this after the stack is running (see [QUICKSTART.md](QUICKSTART.md)).
 
-**Base URL:** `http://localhost:51234` (Docker) or your API host.  
+**Base URL:** `http://localhost:51234` (Docker) or your API host.
 **Windows:** Use Git Bash or WSL for `curl`; or PowerShell with `Invoke-RestMethod` (examples use `curl`).
 
 ---
@@ -19,11 +19,11 @@ curl -s http://localhost:51234/memory/recent
 
 ---
 
-## Phase 2: Criticality, correction, provenance
+## Phase 2: Signals, corrections, provenance
 
 Use one memory ID through the whole flow. Replace `MEMORY_ID` with the UUID from the store response.
 
-### 1. Store a memory and note its ID
+### 1. Store a memory
 
 ```bash
 curl -s -X POST http://localhost:51234/memory \
@@ -33,12 +33,20 @@ curl -s -X POST http://localhost:51234/memory \
 
 Example response:
 ```json
-{"memory_id":"a1b2c3d4-e5f6-7890-abcd-ef1234567890", ...}
+{"memory_id":"a1b2c3d4-e5f6-7890-abcd-ef1234567890", "status":"success", ...}
 ```
 
-Set `MEMORY_ID=a1b2c3d4-e5f6-7890-abcd-ef1234567890` (or use the real UUID in the next commands).
+### 2. Send a criticality signal (new contract)
 
-### 2. Update criticality (manual boost)
+```bash
+curl -s -X POST "http://localhost:51234/memory/$MEMORY_ID/criticality" \
+  -H "Content-Type: application/json" \
+  -d '{"signal": "failure", "reason": "Decision led to a deployment issue"}'
+```
+
+Expected: `{"status":"success","memory_id":"...","signal":"failure","old_score":0,"new_score":0.3}`
+
+### 3. Old format is rejected with a guide
 
 ```bash
 curl -s -X POST "http://localhost:51234/memory/$MEMORY_ID/criticality" \
@@ -46,29 +54,37 @@ curl -s -X POST "http://localhost:51234/memory/$MEMORY_ID/criticality" \
   -d '{"criticality": 0.85, "reason": "High-impact decision"}'
 ```
 
-Expected: `{"status":"success","memory_id":"...","criticality":0.85}`
+Expected: `{"error":"Raw criticality scores are no longer accepted.","guide":"Send {\"signal\": ...} instead..."}`
 
-### 3. Mark operator correction
+### 4. Mark operator correction
 
 ```bash
 curl -s -X POST "http://localhost:51234/memory/$MEMORY_ID/correction"
 ```
 
-Expected: `{"status":"success","memory_id":"...","criticality":1}` (or lower if already near 1; criticality increases by config weight, e.g. 0.5).
+Expected: `{"status":"success","memory_id":"...","old_score":0.3,"new_score":0.8}`
 
-### 4. Get provenance
+### 5. Get recent corrections
+
+```bash
+curl -s "http://localhost:51234/memory/corrections?limit=5"
+```
+
+Expected: Array of corrected memories with `correction_count`, `last_corrected_at`, ordered by most recent correction.
+
+### 6. Get provenance
 
 ```bash
 curl -s "http://localhost:51234/memory/$MEMORY_ID/provenance"
 ```
 
-Expected: JSON with `memory` (full memory object, including `correction_count`) and `events` (array of criticality events: manual_boost, operator_correction, etc.).
+Expected: JSON with `memory` (full memory object including `correction_count`, `reference_count`) and `events` (array of criticality events: failure, operator_correction, etc.).
 
-### 5. 404 behaviour
+### 7. 404 behaviour
 
 ```bash
 # Invalid UUID
-curl -s -X POST "http://localhost:51234/memory/not-a-uuid/criticality" -H "Content-Type: application/json" -d '{"criticality":0.5}'
+curl -s -X POST "http://localhost:51234/memory/not-a-uuid/criticality" -H "Content-Type: application/json" -d '{"signal":"failure"}'
 # Expected: 400 invalid memory id
 
 # Valid UUID but non-existent memory
@@ -82,16 +98,17 @@ curl -s "http://localhost:51234/memory/00000000-0000-0000-0000-000000000000/prov
 
 ```bash
 ID=$(curl -s -X POST http://localhost:51234/memory -H "Content-Type: application/json" -d '{"content":"E2E test memory","source":"operator_input"}' | jq -r .memory_id)
-curl -s -X POST "http://localhost:51234/memory/$ID/criticality" -H "Content-Type: application/json" -d '{"criticality":0.7}'
+curl -s -X POST "http://localhost:51234/memory/$ID/criticality" -H "Content-Type: application/json" -d '{"signal":"failure","reason":"test"}'
 curl -s -X POST "http://localhost:51234/memory/$ID/correction"
+curl -s "http://localhost:51234/memory/corrections" | jq .
 curl -s "http://localhost:51234/memory/$ID/provenance" | jq .
 ```
 
-Requires `jq`. If you don’t have it, use the step-by-step commands above and copy the `memory_id` by hand.
+Requires `jq`. If you don't have it, use the step-by-step commands above and copy the `memory_id` by hand.
 
 ---
 
 ## Troubleshooting
 
-- **`Failed to generate embedding` / `connection refused` to `embeddings:5000`**  
+- **`Failed to generate embedding` / `connection refused` to `embeddings:5000`**
   The embedding sidecar may still be starting (e.g. first run loads the model). Wait 30–60s and retry the POST; `/memory/recent` and `/health` can still work while the sidecar is down.

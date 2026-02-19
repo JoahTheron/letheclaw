@@ -46,7 +46,8 @@ criticality:
   operator_correction_weight: 0.5   # Boost score on correction
   failure_weight: 0.3               # Boost score on failure event
   success_weight: 0.1               # Smaller boost on success
-  decay_weight: -0.05               # Penalty for unused
+  decay_weight: -0.05               # Penalty for unused (deferred)
+  referenced_weight: 0.05           # Small bump when memory appears in search results
 
 retention:
   min_days: 30                # Keep everything for at least 30 days

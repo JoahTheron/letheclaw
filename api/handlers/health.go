@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/letheclaw/api/models"
 )
 
 type HealthHandler struct {
@@ -22,7 +23,7 @@ func (h *HealthHandler) HealthCheck(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"status":       "healthy",
 		"service":      "letheClaw API",
-		"version":      "1.0.0",
+		"version":      models.Version,
 		"memory_count": memoryCount,
 	})
 }

@@ -21,7 +21,7 @@ services:
 
   # Main API service (Go)
   api:
-    image: joahtheron/letheclaw-api
+    image: joahtheron/letheclaw-api:local
     build:
       context: ./api
       dockerfile: Dockerfile

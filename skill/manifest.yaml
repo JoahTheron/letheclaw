@@ -1,6 +1,6 @@
 name: letheclaw
-version: 1.0.0
-description: Strategic memory for AI agents — store, search, and manage memories with criticality and provenance (letheClaw API).
+version: 1.1.0
+description: Strategic memory for AI agents — signal-derived criticality, corrections, and provenance (letheClaw API).
 author: letheclaw
 license: MIT
 permissions:

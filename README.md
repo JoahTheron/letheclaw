@@ -2,17 +2,17 @@
 
 **The memory system that knows when to forget.**
 
-letheClaw gives LLM-based agents a human-like memory layer: hierarchical storage, active forgetting, provenance tracking, and (planned) offline consolidation. Built in Go; runs as a small API plus a Python embedding sidecar (text-to-vector only, not a full LLM).
+letheClaw gives LLM-based agents a long-term memory layer: signal-derived criticality, provenance tracking, active forgetting, and offline consolidation. Built in Go; runs as a small API plus a Python embedding sidecar (text-to-vector only, not a full LLM).
 
 ---
 
 ## Design
 
-- **Active forgetting** – Decay for unused, low-criticality memories  
-- **Criticality** – Scores from operator corrections, failures, successes  
-- **Layered retrieval** – Hot cache (Redis) → warm index (Qdrant) → cold archive (PostgreSQL)  
-- **Provenance** – Source and confidence: observed, operator input, inferred  
-- **Consolidation** *(planned)* – Background worker to compress and prune
+- **Signal-derived criticality** – No LLM-set numbers; scores computed from events (corrections, failures, successes, references)
+- **Provenance** – Source and confidence: observed, operator input, inferred; full event audit trail
+- **Layered retrieval** – Hot cache (Redis) → warm index (Qdrant) → cold archive (PostgreSQL)
+- **Active forgetting** – Decay for unused memories *(Phase 3)*
+- **Consolidation** – Background worker to compress and prune *(Phase 3)*
 
 ---
 
@@ -50,8 +50,8 @@ docker compose up -d
 curl http://localhost:51234/health
 ```
 
-- **API:** `http://localhost:51234` (only exposed port; internal services use Docker network)  
-- **Windows:** [WINDOWS.md](WINDOWS.md)  
+- **API:** `http://localhost:51234` (only exposed port; internal services use Docker network)
+- **Windows:** [WINDOWS.md](WINDOWS.md)
 - **Full setup:** [QUICKSTART.md](QUICKSTART.md)
 
 ---
@@ -64,11 +64,52 @@ curl http://localhost:51234/health
 | POST | `/memory` | Store a memory (content, tags, source, …) |
 | GET | `/memory/search?q=...&limit=5` | Semantic search |
 | GET | `/memory/recent` | Recent memories (cache or DB) |
-| POST | `/memory/:id/criticality` | Set criticality (body: `{"criticality": 0.8, "reason": "..."}`) |
+| GET | `/memory/corrections?limit=10` | Recent corrected memories, ordered by last correction |
+| POST | `/memory/:id/criticality` | Send signal (`{"signal": "failure\|success\|referenced", "reason": "..."}`) |
 | POST | `/memory/:id/correction` | Mark operator correction (boosts criticality, increments counter) |
 | GET | `/memory/:id/provenance` | Get memory plus full criticality event history |
 
-Phase 1 (store, search, recent) and Phase 2 (criticality, correction, provenance) are implemented. Integration with OpenClaw/ClawHub: [INTEGRATION.md](INTEGRATION.md), [skill/](skill/).
+---
+
+## Signal-based criticality
+
+Criticality is computed from events, not LLM-supplied numbers. The old `{"criticality": 0.8}` format is rejected with a guide that teaches the new contract.
+
+**Signals and when to use them:**
+
+- **`failure`** — The memory led to a bad outcome (wrong decision, caused an error, user flagged it as harmful). Weight: 0.3.
+- **`success`** — The memory contributed to a good outcome (decision held up, info proved useful, user confirmed it helped). Weight: 0.1.
+- **`referenced`** — The memory was considered but outcome is neutral/unclear. Also applied automatically by search. Weight: 0.05.
+
+Operator corrections (`POST /memory/:id/correction`) are the strongest signal (weight: 0.5). Weights are configurable in `config/letheclaw.yaml`.
+
+---
+
+## Roadmap
+
+### Phase 1 — Core storage (done)
+
+- POST /memory (storage pipeline: PostgreSQL + Qdrant + Redis)
+- GET /memory/search (semantic search via embeddings)
+- GET /memory/recent (hot cache)
+- Python embedding sidecar (all-MiniLM-L6-v2)
+
+### Phase 2 — Signal-based criticality and corrections (done — v1.1)
+
+- Signal-based criticality: `POST /memory/:id/criticality` accepts `{"signal": "..."}`, rejects raw numbers with a self-correcting guide
+- Automatic reference counting on search (no LLM call)
+- `GET /memory/corrections` endpoint (provenance-based, ordered by last correction)
+- `POST /memory/:id/correction` and `GET /memory/:id/provenance`
+- Criticality column dropped; score derived from event chain
+
+### Phase 3 — Decay and consolidation (next)
+
+- Background worker that applies `decay_weight` to memories unused for > `threshold_days`
+- Inserts `decay` events into `criticality_events` so provenance tracks the decline
+- Respects `min_criticality` floor from config
+- Archive/delete thresholds from `retention` config
+- Consolidation: compress similar memories (similarity > threshold), prune duplicates
+- Consolidation tracking via `consolidation_runs` table (already in schema)
 
 ---
 
@@ -89,7 +130,8 @@ letheclaw/
 │   ├── requirements.txt
 │   └── Dockerfile
 ├── schema/           # PostgreSQL
-│   └── 001_init.sql
+│   ├── 001_init.sql
+│   └── 002_signals.sql
 ├── config/
 │   └── letheclaw.yaml
 ├── docker-compose.yml

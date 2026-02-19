@@ -55,8 +55,9 @@ func main() {
 	router.POST("/memory", memoryHandler.StoreMemory)
 	router.GET("/memory/search", memoryHandler.SearchMemories)
 	router.GET("/memory/recent", memoryHandler.GetRecentMemories)
+	router.GET("/memory/corrections", memoryHandler.GetCorrections)
 
-	// Phase 2: Criticality endpoints
+	// Phase 2: Signal-based criticality, corrections, provenance
 	router.POST("/memory/:id/criticality", memoryHandler.UpdateCriticality)
 	router.POST("/memory/:id/correction", memoryHandler.MarkCorrection)
 	router.GET("/memory/:id/provenance", memoryHandler.GetProvenance)
