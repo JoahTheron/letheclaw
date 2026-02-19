@@ -38,6 +38,7 @@ func main() {
 	embedding := services.NewEmbeddingService(config.Embedding)
 
 	// Initialize handlers
+	healthHandler := handlers.NewHealthHandler(db)
 	memoryHandler := handlers.NewMemoryHandler(db, redis, qdrant, embedding, config)
 
 	// Setup Gin router
@@ -47,8 +48,8 @@ func main() {
 	
 	router := gin.Default()
 
-	router.GET("/health", handlers.HealthCheck)
-	router.HEAD("/health", handlers.HealthCheck)
+	router.GET("/health", healthHandler.HealthCheck)
+	router.HEAD("/health", healthHandler.HealthCheck)
 
 	// Phase 1: Core endpoints
 	router.POST("/memory", memoryHandler.StoreMemory)
