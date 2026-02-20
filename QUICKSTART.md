@@ -292,11 +292,33 @@ This removes:
 - Manual test flow: [TESTING.md](TESTING.md)
 - ClawHub skill: [skill/](skill/). OpenClaw integration: [INTEGRATION.md](INTEGRATION.md).
 
-### Phase 3 — Decay and consolidation (next)
+### Phase 3a — Consolidation ✅
 
-- [ ] Background worker: apply decay_weight to unused memories
-- [ ] Archive/delete based on retention thresholds
-- [ ] Consolidation: compress similar memories, prune duplicates
+- [x] Background goroutine in the API (`api/services/consolidation.go`)
+- [x] Merge similar memories (similarity > 0.95), prune duplicates
+- [x] Track runs in `consolidation_runs` table
+
+### Phase 3b — Decay worker (next)
+
+- [ ] Background goroutine in the API (`api/services/decay.go`)
+- [ ] Query `decay_candidates` view, apply `decay_weight` per tick
+- [ ] Insert `decay` events into `criticality_events`
+- [ ] Respect `min_criticality` floor
+
+### Phase 3c — Archive / delete
+
+- [ ] Background goroutine in the API (`api/services/retention.go`)
+- [ ] Archive memories below `archive_threshold`, remove from Qdrant + Redis
+- [ ] Delete memories below `delete_threshold`
+- [ ] Respect `retention.min_days` (never touch memories younger than 30 days)
+
+### Phase 4 — Contradiction and supersession
+
+- [ ] Detect contradictions between new and existing memories on store
+- [ ] Supersession chain: link newer memory to the older one it replaces
+- [ ] Search returns the latest version when a superseded memory matches
+- [ ] `superseded_by` field in search results for staleness visibility
+- [ ] Provenance trail for supersession events
 
 ---
 

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
@@ -38,7 +39,8 @@ func main() {
 	embedding := services.NewEmbeddingService(config.Embedding)
 
 	// Initialize handlers
-	healthHandler := handlers.NewHealthHandler(db)
+	healthHandler := handlers.NewHealthHandler()
+	statsHandler := handlers.NewStatsHandler(db)
 	memoryHandler := handlers.NewMemoryHandler(db, redis, qdrant, embedding, config)
 
 	// Setup Gin router
@@ -50,6 +52,7 @@ func main() {
 
 	router.GET("/health", healthHandler.HealthCheck)
 	router.HEAD("/health", healthHandler.HealthCheck)
+	router.GET("/stats", statsHandler.GetStats)
 
 	// Phase 1: Core endpoints
 	router.POST("/memory", memoryHandler.StoreMemory)
@@ -61,6 +64,10 @@ func main() {
 	router.POST("/memory/:id/criticality", memoryHandler.UpdateCriticality)
 	router.POST("/memory/:id/correction", memoryHandler.MarkCorrection)
 	router.GET("/memory/:id/provenance", memoryHandler.GetProvenance)
+
+	// Phase 3a: Consolidation background worker
+	consolidationWorker := services.NewConsolidationWorker(db, redis, qdrant, config)
+	go consolidationWorker.Start(context.Background())
 
 	// Start server
 	port := os.Getenv("PORT")

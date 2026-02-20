@@ -92,24 +92,9 @@ services:
       timeout: 5s
       retries: 5
 
-  # Consolidator - background worker (Go) - Phase 3, disabled for now
-  # letheclaw-consolidator:
-  #   build:
-  #     context: ./consolidator
-  #     dockerfile: Dockerfile
-  #   environment:
-  #     - DATABASE_URL=postgresql://letheclaw:letheclaw_pass@postgres:5432/letheclaw?sslmode=disable
-  #     - REDIS_URL=redis://redis:6379/0
-  #     - QDRANT_URL=http://qdrant:6333
-  #     - CONSOLIDATION_INTERVAL=3600
-  #     - LOG_LEVEL=info
-  #   depends_on:
-  #     - postgres
-  #     - redis
-  #     - qdrant
-  #   volumes:
-  #     - ./config:/app/config:ro
-  #   restart: unless-stopped
+  # Phase 3 workers (consolidation, decay, retention) run as background
+  # goroutines inside the API process — no separate service needed.
+  # See api/services/consolidation.go, decay.go (planned), retention.go (planned).
 
 volumes:
   postgres_data:

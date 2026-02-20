@@ -11,8 +11,8 @@ letheClaw gives LLM-based agents a long-term memory layer: signal-derived critic
 - **Signal-derived criticality** – No LLM-set numbers; scores computed from events (corrections, failures, successes, references)
 - **Provenance** – Source and confidence: observed, operator input, inferred; full event audit trail
 - **Layered retrieval** – Hot cache (Redis) → warm index (Qdrant) → cold archive (PostgreSQL)
-- **Active forgetting** – Decay for unused memories *(Phase 3)*
-- **Consolidation** – Background worker to compress and prune *(Phase 3)*
+- **Active forgetting** – Decay for unused memories *(Phase 3b)*
+- **Consolidation** – Background worker to compress and prune *(Phase 3a — done)*
 
 ---
 
@@ -60,7 +60,8 @@ curl http://localhost:51234/health
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/health` | Service health |
+| GET | `/health` | Liveness check (no DB query) |
+| GET | `/stats` | Memory counts by state, consolidation run metrics |
 | POST | `/memory` | Store a memory (content, tags, source, …) |
 | GET | `/memory/search?q=...&limit=5` | Semantic search |
 | GET | `/memory/recent` | Recent memories (cache or DB) |
@@ -102,14 +103,40 @@ Operator corrections (`POST /memory/:id/correction`) are the strongest signal (w
 - `POST /memory/:id/correction` and `GET /memory/:id/provenance`
 - Criticality column dropped; score derived from event chain
 
-### Phase 3 — Decay and consolidation (next)
+### Phase 3a — Consolidation (done)
 
-- Background worker that applies `decay_weight` to memories unused for > `threshold_days`
-- Inserts `decay` events into `criticality_events` so provenance tracks the decline
-- Respects `min_criticality` floor from config
-- Archive/delete thresholds from `retention` config
-- Consolidation: compress similar memories (similarity > threshold), prune duplicates
-- Consolidation tracking via `consolidation_runs` table (already in schema)
+- Background goroutine in the API process (`api/services/consolidation.go`)
+- Query Qdrant for memory pairs with similarity > `consolidation.similarity_threshold` (0.95)
+- Merge similar memories: keep the richer content, union tags, delete duplicate from Qdrant + Postgres
+- Track each run in `consolidation_runs` table (already in schema)
+- Invalidate Redis cache for affected memory IDs
+- Runs every `consolidation.interval_hours`, processes up to `consolidation.batch_size` per run
+
+### Phase 3b — Decay worker (next)
+
+- Background goroutine in the API process (`api/services/decay.go`)
+- Query `decay_candidates` SQL view (active memories not accessed in > `decay.threshold_days`)
+- Apply `criticality.decay_weight` (-0.05) per tick, clamp at `decay.min_criticality` floor (0.3)
+- Insert `decay` events into `criticality_events` so provenance tracks the decline
+- Update `memories.decay_score` column
+
+### Phase 3c — Archive / delete
+
+- Background goroutine in the API process (`api/services/retention.go`)
+- Scan memories whose computed criticality fell below retention thresholds
+- `criticality < retention.archive_threshold` (0.2) and state `active` → archive (remove from Qdrant + Redis, keep in Postgres)
+- `criticality < retention.delete_threshold` (0.1) and state `archived` → delete (or soft-delete)
+- Respect `retention.min_days` (30): never archive/delete memories younger than 30 days
+- Log actions in `consolidation_runs` (`memories_archived`, `memories_deleted` columns)
+
+### Phase 4 — Contradiction and supersession
+
+- Detect when a newer memory contradicts an older one (e.g. "feature X exists" vs. "feature X was removed")
+- On store: compare incoming content against semantically similar existing memories; flag potential contradictions
+- Supersession chain: link the newer memory to the older one it replaces, so retrieval always surfaces the latest version
+- On search: when a superseded memory matches, return the superseding memory instead (or annotate it as outdated)
+- Agent-visible staleness indicator: search results include a `superseded_by` field when a fresher contradicting memory exists
+- Provenance trail: record supersession events so the full history of a fact's evolution is auditable
 
 ---
 
@@ -121,7 +148,7 @@ letheclaw/
 │   ├── main.go
 │   ├── handlers/
 │   ├── models/
-│   ├── services/
+│   ├── services/         # includes Phase 3 background workers
 │   ├── Dockerfile
 │   ├── go.mod
 │   └── go.sum
